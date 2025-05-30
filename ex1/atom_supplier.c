@@ -65,7 +65,6 @@ int main(int argc, char *argv[])
         }
         if (fds[0].revents & POLLIN)
         {
-
             int code;
             ssize_t bytes_read = read(sockfd, &code, sizeof(code));
             if (bytes_read <= 0)

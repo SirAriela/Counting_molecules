@@ -9,13 +9,13 @@
 #include <signal.h>
 
 #define BACKLOG 10
-#define MAX_CLIENTS 100
+#define MAX_CLIENTS 10
 
 volatile sig_atomic_t running = 1;
 
 void handle_sigint(int sig) {
     running = 0;
-    printf("\nSIGINT received — shutting down server gracefully...\n");
+    printf("\nSIGINT received — shutting down server gracefully... bli neder\n");
 }
 
 typedef struct wareHouse {
@@ -51,12 +51,18 @@ int main(int argc, char *argv[]) {
     const char *atoms[] = {"CARBON", "HYDROGEN", "OXYGEN"};
     int port = atoi(argv[1]);
 
+    if (port <= 0 || port > 65535) {
+        fprintf(stderr, "Invalid port number: %d\n", port);
+        return 1;
+    }
+    // Create a listening socket
     int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (listen_fd < 0) {
         perror("socket");
         return 1;
     }
 
+    // Set socket options to allow reuse of the address
     int opt = 1;
     setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
@@ -115,6 +121,7 @@ int main(int argc, char *argv[]) {
             if (fds[i].revents & POLLIN) {
                 char buffer[256];
                 ssize_t len = read(fds[i].fd, buffer, sizeof(buffer) - 1);
+
                 if (len <= 0) {
                     printf("Client disconnected: fd=%d\n", fds[i].fd);
                     close(fds[i].fd);
@@ -129,24 +136,19 @@ int main(int argc, char *argv[]) {
                     char *newline = strchr(buffer, '\n');
                     if (newline) *newline = '\0';
                     
-                    // Skip empty messages or messages with only whitespace
-                    if (strlen(buffer) == 0 || strspn(buffer, " \t\r\n") == strlen(buffer)) {
-                        continue;
-                    }
-                    
                     char atom[16];
-                    int qty = 0;
-                    if (sscanf(buffer, "ADD %15s %d", atom, &qty) == 2 && qty > 0) {
-                        int idx = -1;
+                    int quantity = 0;
+                    if (sscanf(buffer, "ADD %15s %d", atom, &quantity) == 2 && quantity > 0) {
+                        int index_atom = -1;
                         for (int j = 0; j < 3; j++) {
                             if (strcmp(atom, atoms[j]) == 0) {
-                                idx = j + 1;
+                                index_atom = j + 1;
                                 break;
                             }
                         }
-                        if (idx > 0) {
-                            addAtom(idx, qty, &warehouse);
-                            printf("Added %d %s\n", qty, atom);
+                        if (index_atom > 0) {
+                            addAtom(index_atom, quantity, &warehouse);
+                            printf("Added %d %s\n", quantity, atom);
                             printAtoms(&warehouse);
                         } else {
                             printf("Error: Unknown atom type '%s'\n", atom);
@@ -161,8 +163,7 @@ int main(int argc, char *argv[]) {
             fds[i].revents = 0;
         }
     }
-
-    // graceful shutdown
+    // here only if running is false - signal CTRL C
     printf("Shutting down server...\n");
     for (int i = 1; i < nfds; i++) {
         close(fds[i].fd);
