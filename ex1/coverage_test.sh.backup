@@ -1,0 +1,50 @@
+cp coverage_test.sh coverage_test.sh.backup
+
+cat > coverage_test.sh << 'EOF'
+#!/bin/bash
+echo "=== COMPLETE COVERAGE TEST - All Cases ==="
+
+# Clean everything thoroughly
+echo "Cleaning previous runs..."
+pkill -9 warehouse 2>/dev/null || true
+sleep 2
+make clean
+make
+
+echo ""
+echo "=== TEST 1: Invalid Arguments ==="
+./warehouse 2>/dev/null || echo "No args test completed"
+./warehouse 8080 extra_arg 2>/dev/null || echo "Too many args test completed"
+
+echo ""
+echo "=== TEST 2: Normal Operation ==="
+echo "Starting server..."
+./warehouse 8080 &
+MAIN_PID=$!
+sleep 3
+
+echo "Running all command tests..."
+echo "ADD CARBON 10" | ./supplier 127.0.0.1 8080
+echo "ADD HYDROGEN 20" | ./supplier 127.0.0.1 8080
+echo "ADD OXYGEN 5" | ./supplier 127.0.0.1 8080
+echo "ADD NITROGEN 10" | ./supplier 127.0.0.1 8080
+echo "ADD CARBON -5" | ./supplier 127.0.0.1 8080
+echo "ADD CARBON 0" | ./supplier 127.0.0.1 8080
+echo "INVALID COMMAND" | ./supplier 127.0.0.1 8080
+echo "ADD" | ./supplier 127.0.0.1 8080
+echo "ADD CARBON" | ./supplier 127.0.0.1 8080
+echo "random text" | ./supplier 127.0.0.1 8080
+
+echo "Stopping server..."
+kill -INT $MAIN_PID
+sleep 3
+
+echo ""
+echo "=== COVERAGE RESULTS ==="
+gcov atom_warehouse.c -b
+grep "Lines executed" atom_warehouse.c.gcov
+echo ""
+cat atom_warehouse.c.gcov | grep -c "#####" && echo "lines still uncovered" || echo "Perfect coverage!"
+
+echo "Test completed!"
+EOF
