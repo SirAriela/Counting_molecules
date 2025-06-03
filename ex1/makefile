@@ -24,5 +24,5 @@ coverage:
 
 clean:
 	rm -f supplier warehouse *.o *.gcda *.gcno *.gcov
-
+	
 .PHONY: all coverage clean
