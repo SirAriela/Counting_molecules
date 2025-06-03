@@ -29,7 +29,7 @@ void addAtom(int atom, int quantity, wareHouse *warehouse) {
         case 1: warehouse->carbon += quantity; break;
         case 2: warehouse->hydrogen += quantity; break;
         case 3: warehouse->oxygen += quantity; break;
-        default: printf("Unknown atom type\n"); break;
+       
     }
 }
 
@@ -37,6 +37,7 @@ void printAtoms(wareHouse *warehouse) {
     printf("Carbon: %llu\n", warehouse->carbon);
     printf("Hydrogen: %llu\n", warehouse->hydrogen);
     printf("Oxygen: %llu\n", warehouse->oxygen);
+
 }
 
 int main(int argc, char *argv[]) {
@@ -150,8 +151,7 @@ int main(int argc, char *argv[]) {
                             addAtom(index_atom, quantity, &warehouse);
                             printf("Added %d %s\n", quantity, atom);
                             printAtoms(&warehouse);
-                        } else {
-                            printf("Error: Unknown atom type '%s'\n", atom);
+                        
                         }
                     } 
                 }

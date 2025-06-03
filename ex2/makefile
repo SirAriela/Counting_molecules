@@ -19,6 +19,13 @@ molecule_requestor: molecule_requestor.o
 molecule_requestor.o: molecule_requestor.c
 	$(CC) $(CFLAGS) -c molecule_requestor.c
 
+coverage:
+	make clean
+	make all
+	chmod +x coverage_test.sh
+	./coverage_test.sh
+
+
 clean:
 	rm -f supplier warehouse molecule_requestor *.o *.gcda *.gcno *.gcov
 
