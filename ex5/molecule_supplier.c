@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
+#include <sys/un.h>  // Added for Unix Domain Sockets
 #include <unistd.h>
 #include <getopt.h>
 
@@ -19,6 +20,10 @@ extern char *optarg;
 // Global variable to control server shutdown
 volatile sig_atomic_t running = 1;
 
+// Global paths for cleanup on exit
+char *stream_path = NULL;
+char *datagram_path = NULL;
+
 void handle_sigint(int sig)
 {
   running = 0;
@@ -30,6 +35,16 @@ void handle_alarm(int sig)
   printf("Alarm triggered — shutting down due to timeout\n");
   exit(0);
 }
+
+void cleanup_socket_files() {
+  if (stream_path) {
+    unlink(stream_path);
+  }
+  if (datagram_path) {
+    unlink(datagram_path);
+  }
+}
+
 //-------------------atom functions---------------------------------------------
 typedef struct wareHouse
 {
@@ -170,7 +185,7 @@ int genDrinks(wareHouse *wareHouse, const char *drinkToMake)
     total_carbon += carbon;
     total_hydrogen += hydrogen;
     total_oxygen += oxygen;
-    numberOfAtomsNeeded("CARBON DIODXIDE", &carbon, &oxygen, &hydrogen, 1);
+    numberOfAtomsNeeded("CARBON DIOXIDE", &carbon, &oxygen, &hydrogen, 1);
     total_carbon += carbon;
     total_hydrogen += hydrogen;
     total_oxygen += oxygen;
@@ -186,7 +201,7 @@ int genDrinks(wareHouse *wareHouse, const char *drinkToMake)
     total_carbon += carbon;
     total_hydrogen += hydrogen;
     total_oxygen += oxygen;
-    numberOfAtomsNeeded("CARBON DIODXIDE", &carbon, &oxygen, &hydrogen, 1);
+    numberOfAtomsNeeded("CARBON DIOXIDE", &carbon, &oxygen, &hydrogen, 1);
     total_carbon += carbon;
     total_hydrogen += hydrogen;
     total_oxygen += oxygen;
@@ -211,12 +226,12 @@ int genDrinks(wareHouse *wareHouse, const char *drinkToMake)
 int main(int argc, char *argv[])
 {
   // for ex 4
-  //ardument optiond, simple and long opt.
+  //argument options, simple and long opt.
   int c;
   int tcp_port = -1;
   int udp_port = -1;
   int carbon = -1, oxygen = -1, hydrogen = -1;
-  int timeout;
+  int timeout = 0;
 
   //long opt
   struct option longopts[] = {
@@ -226,10 +241,12 @@ int main(int argc, char *argv[])
       {"timeout", required_argument, NULL, 't'},
       {"tcp-port", required_argument, NULL, 'T'},
       {"udp-port", required_argument, NULL, 'U'},
+      {"stream-path", required_argument, NULL, 's'},
+      {"datagram-path", required_argument, NULL, 'd'},
       {0, 0, 0, 0}};
 
   //all options
-  while ((c = getopt_long(argc, argv, ":T:U:c:o:h:t:", longopts, NULL)) != -1)
+  while ((c = getopt_long(argc, argv, ":T:U:c:o:h:t:s:d:", longopts, NULL)) != -1)
   {
     switch (c)
     {
@@ -239,6 +256,14 @@ int main(int argc, char *argv[])
 
     case 'U':
       udp_port = atoi(optarg);
+      break;
+
+    case 's':
+      stream_path = strdup(optarg);
+      break;
+
+    case 'd':
+      datagram_path = strdup(optarg);
       break;
 
     case 'c':
@@ -275,13 +300,23 @@ int main(int argc, char *argv[])
     }
   }
 
-  //check if user put ports for tcp and udp
-  if (tcp_port == -1 || udp_port == -1)
-  {
-    fprintf(stderr, "Usage: %s -T <tcp_port> -U <udp_port>\n", argv[0]);
+  // Validate arguments - need either TCP/UDP ports OR UDS paths
+  int has_inet_sockets = (tcp_port != -1 && udp_port != -1);
+  int has_uds_sockets = (stream_path != NULL && datagram_path != NULL);
+
+  if (!has_inet_sockets && !has_uds_sockets) {
+    fprintf(stderr, "Usage: %s [-T <tcp_port> -U <udp_port>] OR [-s <stream_path> -d <datagram_path>]\n", argv[0]);
     exit(EXIT_FAILURE);
   }
 
+  // Check for conflicting arguments
+  if (has_inet_sockets && has_uds_sockets) {
+    fprintf(stderr, "Error: Cannot use both inet sockets (TCP/UDP) and Unix domain sockets simultaneously\n");
+    exit(EXIT_FAILURE);
+  }
+
+  // Set up cleanup on exit
+  atexit(cleanup_socket_files);
   signal(SIGINT, handle_sigint);
   signal(SIGALRM, handle_alarm);
 
@@ -306,68 +341,129 @@ int main(int argc, char *argv[])
 
   const char *atoms[] = {"CARBON", "HYDROGEN", "OXYGEN"};
 
-  if (tcp_port <= 0 || tcp_port > 65535 || udp_port <= 0 || udp_port > 65535)
-  {
-    fprintf(stderr, "Invalid port number: %d or %d\n", tcp_port, udp_port);
-    return 1;
+  int listen_fd = -1, udp_fd = -1;
+  struct sockaddr_un unix_addr;
+
+  if (has_inet_sockets) {
+    // Validate inet ports
+    if (tcp_port <= 0 || tcp_port > 65535 || udp_port <= 0 || udp_port > 65535)
+    {
+      fprintf(stderr, "Invalid port number: %d or %d\n", tcp_port, udp_port);
+      return 1;
+    }
+
+    //--------------------tcp socket setup-------------------------------
+    // Create a listening socket
+    listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (listen_fd < 0)
+    {
+      perror("socket");
+      return 1;
+    }
+
+    // Set socket options to allow reuse of the address
+    int opt = 1;
+    setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    struct sockaddr_in serv_addr = {.sin_family = AF_INET,
+                                    .sin_port = htons(tcp_port),
+                                    .sin_addr.s_addr = INADDR_ANY};
+
+    if (bind(listen_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    {
+      perror("bind");
+      close(listen_fd);
+      return 1;
+    }
+
+    if (listen(listen_fd, BACKLOG) < 0)
+    {
+      perror("listen");
+      close(listen_fd);
+      return 1;
+    }
+
+    // -------------------udp socket setup-------------------------------
+    udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (udp_fd < 0)
+    {
+      perror("socket");
+      close(listen_fd);
+      return 1;
+    }
+
+    struct sockaddr_in udp_addr = {.sin_family = AF_INET,
+                                   .sin_port = htons(udp_port),
+                                   .sin_addr.s_addr = INADDR_ANY};
+
+    if (bind(udp_fd, (struct sockaddr *)&udp_addr, sizeof(udp_addr)) < 0)
+    {
+      perror("UDP bind");
+      close(listen_fd);
+      close(udp_fd);
+      return 1;
+    }
+
+    printf("Server running on TCP port %d and UDP port %d...\n", tcp_port, udp_port);
   }
-  //--------------------tcp socket setup-------------------------------
+  else {
+    // UDS setup
+    //--------------------UDS stream socket setup-------------------------------
+    listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (listen_fd < 0)
+    {
+      perror("UDS stream socket");
+      return 1;
+    }
 
-  // Create a listening socket
-  int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (listen_fd < 0)
-  {
-    perror("socket");
-    return 1;
+    // Remove existing socket file if it exists
+    unlink(stream_path);
+
+    memset(&unix_addr, 0, sizeof(unix_addr));
+    unix_addr.sun_family = AF_UNIX;
+    strncpy(unix_addr.sun_path, stream_path, sizeof(unix_addr.sun_path) - 1);
+
+    if (bind(listen_fd, (struct sockaddr *)&unix_addr, sizeof(unix_addr)) < 0)
+    {
+      perror("UDS stream bind");
+      close(listen_fd);
+      return 1;
+    }
+
+    if (listen(listen_fd, BACKLOG) < 0)
+    {
+      perror("UDS stream listen");
+      close(listen_fd);
+      return 1;
+    }
+
+    // -------------------UDS datagram socket setup-------------------------------
+    udp_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (udp_fd < 0)
+    {
+      perror("UDS datagram socket");
+      close(listen_fd);
+      return 1;
+    }
+
+    // Remove existing socket file if it exists
+    unlink(datagram_path);
+
+    memset(&unix_addr, 0, sizeof(unix_addr));
+    unix_addr.sun_family = AF_UNIX;
+    strncpy(unix_addr.sun_path, datagram_path, sizeof(unix_addr.sun_path) - 1);
+
+    if (bind(udp_fd, (struct sockaddr *)&unix_addr, sizeof(unix_addr)) < 0)
+    {
+      perror("UDS datagram bind");
+      close(listen_fd);
+      close(udp_fd);
+      return 1;
+    }
+
+    printf("Server running on UDS stream socket %s and datagram socket %s...\n", 
+           stream_path, datagram_path);
   }
-
-  // Set socket options to allow reuse of the address
-  int opt = 1;
-  setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
-  struct sockaddr_in serv_addr = {.sin_family = AF_INET,
-                                  .sin_port = htons(tcp_port),
-                                  .sin_addr.s_addr = INADDR_ANY};
-
-  if (bind(listen_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-  {
-    perror("bind");
-    close(listen_fd);
-    return 1;
-  }
-
-  if (listen(listen_fd, BACKLOG) < 0)
-  {
-    perror("listen");
-    close(listen_fd);
-    return 1;
-  }
-
-  //---------------------------------------------------------------------------------------
-
-  // -------------------udp socket setup-------------------------------
-  int udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
-
-  if (udp_fd < 0)
-  {
-    perror("socket");
-    close(udp_fd);
-    return 1;
-  }
-  struct sockaddr_in udp_addr = {.sin_family = AF_INET,
-                                 .sin_port = htons(udp_port),
-                                 .sin_addr.s_addr = INADDR_ANY};
-
-  if (bind(udp_fd, (struct sockaddr *)&udp_addr, sizeof(udp_addr)) < 0)
-  {
-    perror("UDP bind");
-    close(listen_fd);
-    close(udp_fd);
-    return 1;
-  }
-
-  struct sockaddr_in client_addr;
-  socklen_t addr_len = sizeof(client_addr);
 
   // ---------------- fds setup for poll ------------------------
   struct pollfd fds[MAX_CLIENTS];
@@ -379,7 +475,8 @@ int main(int argc, char *argv[])
   fds[2].fd = STDIN_FILENO;
   fds[2].events = POLLIN;
 
-  printf("Server running on ports %d ,%d...\n", tcp_port, udp_port);
+  struct sockaddr_storage client_addr;
+  socklen_t addr_len = sizeof(client_addr);
 
   while (running)
   {
@@ -392,11 +489,10 @@ int main(int argc, char *argv[])
       break;
     }
 
-    // tcp
-    //  Handle new connections first
+    // Handle new connections first (both TCP and UDS stream)
     if (fds[0].revents & POLLIN)
     {
-      alarm(timeout);
+      if (timeout > 0) alarm(timeout);
       int client_fd = accept(listen_fd, NULL, NULL);
       if (client_fd >= 0 && nfds < MAX_CLIENTS)
       {
@@ -413,9 +509,10 @@ int main(int argc, char *argv[])
       }
     }
 
+    // Handle datagram messages (both UDP and UDS datagram)
     if (fds[1].revents & POLLIN)
     {
-      alarm(timeout);
+      if (timeout > 0) alarm(timeout);
       char buffer[256];
       ssize_t len = recvfrom(udp_fd, buffer, sizeof(buffer) - 1, 0,
                              (struct sockaddr *)&client_addr, &addr_len);
@@ -450,8 +547,6 @@ int main(int argc, char *argv[])
             snprintf(response, sizeof(response), "did not deliver %s, sorry.",
                      molecule);
           }
-          // sendto(udp_fd, response, strlen(response), 0, (struct sockaddr
-          // *)&client_addr, addr_len);
         }
         else if (sscanf(buffer, "DELIVER %15s %15s %d", word1, word2,
                         &quantity) == 3 &&
@@ -478,12 +573,13 @@ int main(int argc, char *argv[])
                (struct sockaddr *)&client_addr, addr_len);
       }
     }
+
     // Handle client data - process from end to beginning to avoid index issues
     for (int i = nfds - 1; i >= 3; i--)
     {
       if (fds[i].revents & POLLIN)
       {
-        alarm(timeout);
+        if (timeout > 0) alarm(timeout);
         char buffer[256];
         ssize_t len = read(fds[i].fd, buffer, sizeof(buffer) - 1);
 
@@ -535,9 +631,10 @@ int main(int argc, char *argv[])
       }
     }
 
+    // Handle stdin input
     if (fds[2].revents & POLLIN)
     {
-      alarm(timeout);
+      if (timeout > 0) alarm(timeout);
       char buffer[256];
       char drink[64];
       int status;
@@ -550,7 +647,6 @@ int main(int argc, char *argv[])
 
         if (strncmp(buffer, "GEN ", 4) == 0)
         {
-
           strncpy(drink, buffer + 4, sizeof(drink) - 1);
           drink[sizeof(drink) - 1] = '\0';
 
@@ -582,6 +678,7 @@ int main(int argc, char *argv[])
       fds[i].revents = 0;
     }
   }
+
   // here only if running is false - signal CTRL C
   printf("Shutting down server...\n");
   for (int i = 1; i < nfds; i++)
@@ -590,6 +687,7 @@ int main(int argc, char *argv[])
   }
 
   close(listen_fd);
+  if (udp_fd != -1) close(udp_fd);
   printf("Server terminated.\n");
   return 0;
 }
