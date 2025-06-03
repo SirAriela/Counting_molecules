@@ -12,6 +12,10 @@
 #define BACKLOG 10
 #define MAX_CLIENTS 12
 
+extern int optopt;
+extern char *optarg;
+
+
 // Global variable to control server shutdown
 volatile sig_atomic_t running = 1;
 
