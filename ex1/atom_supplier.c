@@ -72,8 +72,7 @@ int main(int argc, char *argv[])
                 perror("read");
                 break;
             }
-            running = 0;
-            close(sockfd);
+          
         }
         if (fds[1].revents & POLLIN)
         {
