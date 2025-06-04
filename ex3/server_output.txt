@@ -1,0 +1,10 @@
+Server running on ports 8080 ,8081...
+New client connected: fd=5
+Added 14 CARBON
+Carbon: 14
+Hydrogen: 0
+Oxygen: 0
+
+SIGINT received — shutting down server gracefully... bli neder
+Shutting down server...
+Server terminated.

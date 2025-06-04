@@ -120,7 +120,6 @@ rm -f fake_listen.so fake_listen.c
 ' || echo "✓ listen() failure test done"
 
 
-
 echo "Stopping server..."
 if kill -0 $SERVER_PID 2>/dev/null; then
     kill -SIGINT $SERVER_PID

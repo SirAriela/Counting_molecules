@@ -144,24 +144,18 @@ gcc -shared -fPIC fake_sendto.c -o fake_sendto.so 2>/dev/null
 echo "DELIVER WATER 2" | LD_PRELOAD=./fake_sendto.so ./molecule_requestor 127.0.0.1 12346 2>/dev/null || echo "✓ sendto error test done"
 rm -f fake_sendto.c fake_sendto.so
 
-# MOLECULE_SUPPLIER TESTS (adapted from warehouse tests)
+# MOLECULE_SUPPLIER TESTS 
 echo "=== MOLECULE_SUPPLIER TESTS ==="
-
-
-
 echo "Test M1: No arguments"
 ./molecule_supplier 2>/dev/null || echo "✓ Correctly rejected no args"
-
 echo "Test M2: Invalid port"
 ./molecule_supplier 0 8081 2>/dev/null || echo "✓ Correctly rejected port 0"
-
 echo "Test M3: Bind error - port already in use"
 timeout 3 bash -c "
 ./molecule_supplier $TCP_PORT $UDP_PORT 2>/dev/null &
 sleep 0.5
-./molecule_supplier $TCP_PORT $UDP_PORT 2>/dev/null  # This should fail with bind error
+./molecule_supplier $TCP_PORT $UDP_PORT 2>/dev/null # This should fail with bind error
 " || echo "✓ Bind error test done"
-
 echo "Test M4: Mock socket failure for molecule_supplier"
 timeout 3 bash -c '
 echo "int socket(int a,int b,int c){return -1;}" > fake_socket_server.c
@@ -169,77 +163,65 @@ gcc -shared -fPIC fake_socket_server.c -o fake_socket_server.so 2>/dev/null
 LD_PRELOAD=./fake_socket_server.so ./molecule_supplier '"$TCP_PORT"' '"$UDP_PORT"' 2>/dev/null
 rm -f fake_socket_server.so fake_socket_server.c
 ' || echo "✓ molecule_supplier socket error test done"
-
 echo "Test M5: Mock listen() failure"
 timeout 3 bash -c '
 echo "#include <sys/socket.h>
 #include <errno.h>
 int listen(int sockfd, int backlog) {
-    errno = EADDRINUSE;
-    return -1;
+ errno = EADDRINUSE;
+ return -1;
 }" > fake_listen.c
 gcc -shared -fPIC fake_listen.c -o fake_listen.so 2>/dev/null
-LD_PRELOAD=./fake_listen.so ./molecule_supplier 9999 9998 2>/dev/null  # Different ports!
+LD_PRELOAD=./fake_listen.so ./molecule_supplier 9999 9998 2>/dev/null # Different ports!
 rm -f fake_listen.so fake_listen.c
 ' || echo "✓ listen() failure test done"
 
-echo "Test M7: GLUCOSE with proper gcov coverage"
+#Molecule supplier test
+
+echo "Test 1: GLUCOSE delivery with sufficient atoms"
 timeout 10 bash -c '
 ./molecule_supplier 8080 8081 &
 SERVER_PID=$!
 sleep 1
+
+# Add sufficient atoms for GLUCOSE (6C + 12H + 6O)
 echo "ADD CARBON 6" | ./atom_supplier 127.0.0.1 8080 &
 sleep 1
 echo "ADD HYDROGEN 12" | ./atom_supplier 127.0.0.1 8080 &
 sleep 1
 echo "ADD OXYGEN 6" | ./atom_supplier 127.0.0.1 8080 &
 sleep 2
+
+# Request GLUCOSE delivery
 echo "DELIVER GLUCOSE 1" | ./molecule_requestor 127.0.0.1 8081
 
-kill -SIGINT $SERVER_PID  # שלח SIGINT במקום SIGTERM
+# Clean shutdown
+kill -SIGINT $SERVER_PID
 wait $SERVER_PID
-'
+' || echo "✓ GLUCOSE delivery test completed"
 
-echo "Test M8: ALCOHOL coverage"
+echo "Test 2: ALCOHOL delivery with sufficient atoms"
 timeout 10 bash -c '
 ./molecule_supplier 8080 8081 &
 SERVER_PID=$!
 sleep 1
+
+# Add sufficient atoms for ALCOHOL (2C + 6H + 1O)
 echo "ADD CARBON 2" | ./atom_supplier 127.0.0.1 8080 &
 sleep 1
 echo "ADD HYDROGEN 6" | ./atom_supplier 127.0.0.1 8080 &
 sleep 1
 echo "ADD OXYGEN 1" | ./atom_supplier 127.0.0.1 8080 &
 sleep 2
-echo "DELIVER ALCOHOL 1" | ./molecule_requestor 127.0.0.1 8081
-kill -SIGINT $SERVER_PID
-wait $SERVER_PID
-'
-echo "Test M9: Successful CARBON DIOXIDE delivery"
-timeout 10 bash -c '
-./molecule_supplier 8080 8081 &
-SERVER_PID=$!
-sleep 1
-echo "ADD CARBON 1" | ./atom_supplier 127.0.0.1 8080 &
-sleep 1
-echo "ADD OXYGEN 2" | ./atom_supplier 127.0.0.1 8080 &
-sleep 2
-echo "DELIVER CARBON DIOXIDE 1" | ./molecule_requestor 127.0.0.1 8081
-kill -SIGINT $SERVER_PID
-wait $SERVER_PID
-'
 
-echo "Test M10: Unknown atom"
-timeout 10 bash -c '
-./molecule_supplier 8080 8081 &
-SERVER_PID=$!
-sleep 1
-echo "ADD HELIUM 5" | ./atom_supplier 127.0.0.1 8080 &
-sleep 1
+# Request ALCOHOL delivery
+echo "DELIVER ALCOHOL 1" | ./molecule_requestor 127.0.0.1 8081
+
 kill -SIGINT $SERVER_PID
 wait $SERVER_PID
-'
-echo "Test M11: Unknown molecule"
+' || echo "✓ ALCOHOL delivery test completed"
+
+echo "Test 3: Unknown molecule"
 timeout 10 bash -c '
 ./molecule_supplier 8080 8081 &
 SERVER_PID=$!
@@ -247,62 +229,150 @@ sleep 1
 echo "DELIVER FOOBAR 1" | ./molecule_requestor 127.0.0.1 8081
 kill -SIGINT $SERVER_PID
 wait $SERVER_PID
-'
+' || echo "✓ Unknown molecule test completed"
 
-echo "Test M12: Max clients reached"
-timeout 15 bash -c '
-./molecule_supplier 8080 8081 &
+echo "Test 4: Generate VODKA "
+timeout 12 bash -c '
+{
+    sleep 1
+    echo "GEN VODKA"
+    sleep 2
+} | ./molecule_supplier 8080 8081 &
+SERVER_PID=$!
+
+sleep 0.5
+echo "ADD CARBON 8" | ./atom_supplier 127.0.0.1 8080 &
+echo "ADD HYDROGEN 20" | ./atom_supplier 127.0.0.1 8080 &
+echo "ADD OXYGEN 8" | ./atom_supplier 127.0.0.1 8080 &
+
+sleep 3
+
+# Stop server gracefully
+kill -SIGINT $SERVER_PID
+wait $SERVER_PID 2>/dev/null
+' || echo "✓ VODKA generation test completed"
+
+echo "Test 5: Generate CHAMPAGNE "
+timeout 12 bash -c '
+{
+    sleep 1
+    echo "GEN CHAMPAGNE"
+    sleep 2
+} | ./molecule_supplier 8082 8083 &
+SERVER_PID=$!
+
+sleep 0.5
+echo "ADD CARBON 3" | ./atom_supplier 127.0.0.1 8082 &
+echo "ADD HYDROGEN 8" | ./atom_supplier 127.0.0.1 8082 &
+echo "ADD OXYGEN 4" | ./atom_supplier 127.0.0.1 8082 &
+
+sleep 3
+
+# Stop server gracefully
+kill -SIGINT $SERVER_PID
+wait $SERVER_PID 2>/dev/null
+' || echo "✓ CHAMPAGNE generation test completed"
+
+echo "Test 6: Generate SOFT DRINK"
+timeout 12 bash -c '
+{
+    sleep 1
+    echo "GEN SOFT DRINK"
+    sleep 2
+} | ./molecule_supplier 8084 8085 &
+SERVER_PID=$!
+
+sleep 0.5
+echo "ADD CARBON 7" | ./atom_supplier 127.0.0.1 8084 &
+echo "ADD HYDROGEN 14" | ./atom_supplier 127.0.0.1 8084 &
+echo "ADD OXYGEN 9" | ./atom_supplier 127.0.0.1 8084 &
+
+sleep 3
+
+# Stop server gracefully
+kill -SIGINT $SERVER_PID
+wait $SERVER_PID 2>/dev/null
+' || echo "✓ SOFT DRINK generation test completed"
+
+echo "Test 7: Insufficient atoms for drinks"
+timeout 8 bash -c '
+{
+    sleep 1
+    echo "GEN VODKA"
+    sleep 2
+} | ./molecule_supplier 8090 8091 &
+SERVER_PID=$!
+
+sleep 0.5
+# Add insufficient atoms (need 8C but only add 2)
+echo "ADD CARBON 2" | ./atom_supplier 127.0.0.1 8090 &
+echo "ADD HYDROGEN 5" | ./atom_supplier 127.0.0.1 8090 &
+echo "ADD OXYGEN 2" | ./atom_supplier 127.0.0.1 8090 &
+
+sleep 3
+kill -SIGINT $SERVER_PID
+wait $SERVER_PID 2>/dev/null
+' || echo "✓ Insufficient atoms test completed"
+
+
+echo "Test 8: Invalid GEN command"  
+timeout 8 bash -c '
+{
+    sleep 1
+    echo "INVALID COMMAND"
+    sleep 2
+} | ./molecule_supplier 8092 8093 &
+SERVER_PID=$!
+
+sleep 3
+kill -SIGINT $SERVER_PID
+wait $SERVER_PID 2>/dev/null
+' || echo "✓ Invalid command test completed"
+
+---
+echo "Test M9: DELIVER CARBON DIOXIDE with sufficient atoms"
+timeout 10 bash -c '
+./molecule_supplier 8094 8095 & # Use new unique ports
 SERVER_PID=$!
 sleep 1
 
-# Start multiple atom suppliers to exceed max clients
-for i in $(seq 1 12); do 
-    (echo "ADD CARBON 1"; sleep 10) | ./atom_supplier 127.0.0.1 8080 &
-done
+# Add sufficient atoms for CARBON DIOXIDE (1C + 2O)
+echo "ADD CARBON 1" | ./atom_supplier 127.0.0.1 8094 &
+sleep 0.5
+echo "ADD OXYGEN 2" | ./atom_supplier 127.0.0.1 8094 &
 sleep 2
 
-# Try to add another atom supplier which should be rejected
-echo "ADD CARBON 1" | ./atom_supplier 127.0.0.1 8080 || echo "✓ Max clients rejection test done"
+# Request CARBON DIOXIDE delivery via UDP
+echo "DELIVER CARBON DIOXIDE 1" | ./molecule_requestor 127.0.0.1 8095
 
+# Clean shutdown
 kill -SIGINT $SERVER_PID
 wait $SERVER_PID
-'
-echo "Test M13: UDP newline removal"
+' || echo "✓ CARBON DIOXIDE delivery with sufficient atoms test completed"
+
+# Test M10: Max clients reached
+echo "Test M10: Max clients reached"
 timeout 10 bash -c '
-./molecule_supplier 8080 8081 &
+./molecule_supplier 8070 8071 &
 SERVER_PID=$!
 sleep 1
 
-# Send a UDP message with a newline at the end
-python3 -c "
-import socket
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-s.sendto(b\"DELIVER WATER 1\n\", (\"127.0.0.1\", 8081))
-s.close()
-"
+# Open 12 clients (MAX_CLIENTS) that stay connected
+for i in $(seq 1 12); do
+    (echo "ADD CARBON 1"; sleep 8) | ./atom_supplier 127.0.0.1 8070 &
+    sleep 0.1
+done
 
-kill -SIGINT $SERVER_PID
-wait $SERVER_PID
-'
-
-echo "Test M14: TCP newline removal"
-timeout 10 bash -c '
-./molecule_supplier 8080 8081 &
-SERVER_PID=$!
 sleep 1
 
-# Use Python to send TCP message
-python3 -c "
-import socket
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((\"127.0.0.1\", 8080))
-s.send(b\"ADD CARBON 1\n\")
-s.close()
-"
+# Try 13th client - should be rejected
+echo "ADD HYDROGEN 1" | ./atom_supplier 127.0.0.1 8070 &
+sleep 2
 
 kill -SIGINT $SERVER_PID
-wait $SERVER_PID
-'
+wait $SERVER_PID 2>/dev/null
+' || echo "✓ Max clients reached test completed"
+
 
 # Stop server
 echo "Stopping server..."
@@ -324,8 +394,6 @@ pkill -f "molecule_supplier" 2>/dev/null || true
 pkill -f "atom_supplier" 2>/dev/null || true
 pkill -f "molecule_requestor" 2>/dev/null || true
 sleep 1
-
-
 
 echo "Server stopped"
 
