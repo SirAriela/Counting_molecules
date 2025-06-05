@@ -15,16 +15,16 @@ make all > /dev/null 2>&1
 # Manual build for missing files - force rebuild with coverage
 echo "Building executables with coverage..."
 gcc --coverage -o atom_supplier atom_supplier.c 2>/dev/null || echo "Could not build atom_supplier"
-gcc --coverage -o molecule_supplier molecule_supplier.c 2>/dev/null || echo "Could not build molecule_supplier"
+gcc --coverage -o drinks_bar drinks_bar.c 2>/dev/null || echo "Could not build drinks_bar"
 
 echo "Checking built files..."
-ls -la atom_supplier molecule_supplier *.gcno 2>/dev/null
+ls -la atom_supplier drinks_bar *.gcno 2>/dev/null
 
 echo "Running tests..."
 
-# Start molecule_supplier server
+# Start drinks_bar server
 echo "Starting molecule supplier server on ports $TCP_PORT (TCP) and $UDP_PORT (UDP)..."
-./molecule_supplier $TCP_PORT $UDP_PORT &
+./drinks_bar $TCP_PORT $UDP_PORT &
 SERVER_PID=$!
 sleep 2
 
@@ -84,7 +84,7 @@ wait \$SUPPLIER_PID
 
 # Restart server for remaining tests
 echo "Restarting server..."
-./molecule_supplier $TCP_PORT $UDP_PORT &
+./drinks_bar $TCP_PORT $UDP_PORT &
 SERVER_PID=$!
 sleep 2
 
@@ -144,25 +144,25 @@ gcc -shared -fPIC fake_sendto.c -o fake_sendto.so 2>/dev/null
 echo "DELIVER WATER 2" | LD_PRELOAD=./fake_sendto.so ./molecule_requestor 127.0.0.1 12346 2>/dev/null || echo "✓ sendto error test done"
 rm -f fake_sendto.c fake_sendto.so
 
-# MOLECULE_SUPPLIER TESTS 
-echo "=== MOLECULE_SUPPLIER TESTS ==="
+# drinks_bar TESTS 
+echo "=== drinks_bar TESTS ==="
 echo "Test M1: No arguments"
-./molecule_supplier 2>/dev/null || echo "✓ Correctly rejected no args"
+./drinks_bar 2>/dev/null || echo "✓ Correctly rejected no args"
 echo "Test M2: Invalid port"
-./molecule_supplier 0 8081 2>/dev/null || echo "✓ Correctly rejected port 0"
+./drinks_bar 0 8081 2>/dev/null || echo "✓ Correctly rejected port 0"
 echo "Test M3: Bind error - port already in use"
 timeout 3 bash -c "
-./molecule_supplier $TCP_PORT $UDP_PORT 2>/dev/null &
+./drinks_bar $TCP_PORT $UDP_PORT 2>/dev/null &
 sleep 0.5
-./molecule_supplier $TCP_PORT $UDP_PORT 2>/dev/null # This should fail with bind error
+./drinks_bar $TCP_PORT $UDP_PORT 2>/dev/null # This should fail with bind error
 " || echo "✓ Bind error test done"
-echo "Test M4: Mock socket failure for molecule_supplier"
+echo "Test M4: Mock socket failure for drinks_bar"
 timeout 3 bash -c '
 echo "int socket(int a,int b,int c){return -1;}" > fake_socket_server.c
 gcc -shared -fPIC fake_socket_server.c -o fake_socket_server.so 2>/dev/null
-LD_PRELOAD=./fake_socket_server.so ./molecule_supplier '"$TCP_PORT"' '"$UDP_PORT"' 2>/dev/null
+LD_PRELOAD=./fake_socket_server.so ./drinks_bar '"$TCP_PORT"' '"$UDP_PORT"' 2>/dev/null
 rm -f fake_socket_server.so fake_socket_server.c
-' || echo "✓ molecule_supplier socket error test done"
+' || echo "✓ drinks_bar socket error test done"
 echo "Test M5: Mock listen() failure"
 timeout 3 bash -c '
 echo "#include <sys/socket.h>
@@ -172,7 +172,7 @@ int listen(int sockfd, int backlog) {
  return -1;
 }" > fake_listen.c
 gcc -shared -fPIC fake_listen.c -o fake_listen.so 2>/dev/null
-LD_PRELOAD=./fake_listen.so ./molecule_supplier 9999 9998 2>/dev/null # Different ports!
+LD_PRELOAD=./fake_listen.so ./drinks_bar 9999 9998 2>/dev/null # Different ports!
 rm -f fake_listen.so fake_listen.c
 ' || echo "✓ listen() failure test done"
 
@@ -180,7 +180,7 @@ rm -f fake_listen.so fake_listen.c
 
 echo "Test 1: GLUCOSE delivery with sufficient atoms"
 timeout 10 bash -c '
-./molecule_supplier 8080 8081 &
+./drinks_bar 8080 8081 &
 SERVER_PID=$!
 sleep 1
 
@@ -202,7 +202,7 @@ wait $SERVER_PID
 
 echo "Test 2: ALCOHOL delivery with sufficient atoms"
 timeout 10 bash -c '
-./molecule_supplier 8080 8081 &
+./drinks_bar 8080 8081 &
 SERVER_PID=$!
 sleep 1
 
@@ -223,7 +223,7 @@ wait $SERVER_PID
 
 echo "Test 3: Unknown molecule"
 timeout 10 bash -c '
-./molecule_supplier 8080 8081 &
+./drinks_bar 8080 8081 &
 SERVER_PID=$!
 sleep 1
 echo "DELIVER FOOBAR 1" | ./molecule_requestor 127.0.0.1 8081
@@ -237,7 +237,7 @@ timeout 12 bash -c '
     sleep 1
     echo "GEN VODKA"
     sleep 2
-} | ./molecule_supplier 8080 8081 &
+} | ./drinks_bar 8080 8081 &
 SERVER_PID=$!
 
 sleep 0.5
@@ -258,7 +258,7 @@ timeout 12 bash -c '
     sleep 1
     echo "GEN CHAMPAGNE"
     sleep 2
-} | ./molecule_supplier 8082 8083 &
+} | ./drinks_bar 8082 8083 &
 SERVER_PID=$!
 
 sleep 0.5
@@ -279,7 +279,7 @@ timeout 12 bash -c '
     sleep 1
     echo "GEN SOFT DRINK"
     sleep 2
-} | ./molecule_supplier 8084 8085 &
+} | ./drinks_bar 8084 8085 &
 SERVER_PID=$!
 
 sleep 0.5
@@ -300,7 +300,7 @@ timeout 8 bash -c '
     sleep 1
     echo "GEN VODKA"
     sleep 2
-} | ./molecule_supplier 8090 8091 &
+} | ./drinks_bar 8090 8091 &
 SERVER_PID=$!
 
 sleep 0.5
@@ -321,7 +321,7 @@ timeout 8 bash -c '
     sleep 1
     echo "INVALID COMMAND"
     sleep 2
-} | ./molecule_supplier 8092 8093 &
+} | ./drinks_bar 8092 8093 &
 SERVER_PID=$!
 
 sleep 3
@@ -332,7 +332,7 @@ wait $SERVER_PID 2>/dev/null
 ---
 echo "Test M9: DELIVER CARBON DIOXIDE with sufficient atoms"
 timeout 10 bash -c '
-./molecule_supplier 8094 8095 & # Use new unique ports
+./drinks_bar 8094 8095 & # Use new unique ports
 SERVER_PID=$!
 sleep 1
 
@@ -353,7 +353,7 @@ wait $SERVER_PID
 # Test M10: Max clients reached
 echo "Test M10: Max clients reached"
 timeout 10 bash -c '
-./molecule_supplier 8070 8071 &
+./drinks_bar 8070 8071 &
 SERVER_PID=$!
 sleep 1
 
@@ -390,7 +390,7 @@ fi
 wait $SERVER_PID 2>/dev/null || true
 
 # Additional cleanup
-pkill -f "molecule_supplier" 2>/dev/null || true
+pkill -f "drinks_bar" 2>/dev/null || true
 pkill -f "atom_supplier" 2>/dev/null || true
 pkill -f "molecule_requestor" 2>/dev/null || true
 sleep 1
