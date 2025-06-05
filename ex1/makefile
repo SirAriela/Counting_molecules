@@ -23,6 +23,6 @@ coverage:
 	./coverage_test.sh
 
 clean:
-	rm -f supplier warehouse *.o *.gcda *.gcno *.gcov
+	rm -f supplier warehouse test *.o *.gcda *.gcno *.gcov
 	
 .PHONY: all coverage clean

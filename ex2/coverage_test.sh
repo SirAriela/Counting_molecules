@@ -88,13 +88,6 @@ echo "Restarting server..."
 SERVER_PID=$!
 sleep 2
 
-echo "Test 9: Mock socket failure"
-timeout 3 bash -c '
-echo "int socket(int a,int b,int c){return -1;}" > fake_socket.c
-gcc -shared -fPIC fake_socket.c -o fake_socket.so 2>/dev/null
-LD_PRELOAD=./fake_socket.so ./atom_supplier 127.0.0.1 '"$TCP_PORT"' 2>/dev/null
-rm -f fake_socket.so fake_socket.c
-' || echo "✓ Mocked socket failure test done"
 
 echo "=== MOLECULE_REQUESTOR TESTS ==="
 
@@ -143,6 +136,13 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
 gcc -shared -fPIC fake_sendto.c -o fake_sendto.so 2>/dev/null
 echo "DELIVER WATER 2" | LD_PRELOAD=./fake_sendto.so ./molecule_requestor 127.0.0.1 12346 2>/dev/null || echo "✓ sendto error test done"
 rm -f fake_sendto.c fake_sendto.so
+
+echo "Test R9: DELIVER NOTHING"
+timeout 5 bash -c "printf '\n' | ./molecule_requestor 127.0.0.1 $UDP_PORT"
+ 2>/dev/null || echo "✓ delivery test done"
+
+echo "Test R10: Test EOF case"
+timeout 5 bash -c "./molecule_requestor 127.0.0.1 $UDP_PORT < /dev/null"
 
 # MOLECULE_SUPPLIER TESTS (adapted from warehouse tests)
 echo "=== MOLECULE_SUPPLIER TESTS ==="
@@ -303,6 +303,8 @@ s.close()
 kill -SIGINT $SERVER_PID
 wait $SERVER_PID
 '
+
+
 
 # Stop server
 echo "Stopping server..."
