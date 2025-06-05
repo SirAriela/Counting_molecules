@@ -442,4 +442,4 @@ calculate_coverage() {
 
 calculate_coverage "atom_supplier.c"
 calculate_coverage "molecule_requestor.c"
-calculate_coverage "molecule_supplier.c"
+calculate_coverage "drinks_bar.c"

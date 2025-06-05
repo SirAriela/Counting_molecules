@@ -206,6 +206,78 @@ int genDrinks(wareHouse *wareHouse, const char *drinkToMake)
   return 1;
 }
 
+int min(int a, int b, int c)
+{
+  if (a <= b && a <= c)
+    return a;
+  if (b <= a && b <= c)
+    return b;
+  return c;
+}
+
+void howManyDrinks(wareHouse *wareHouse, const char *drinkToMake)
+{
+  int total_carbon = 0, total_oxygen = 0, total_hydrogen = 0;
+  int carbon, oxygen, hydrogen;
+  unsigned long long CounerDrinksCarbon, CounerDrinksOxygen, CounerDrinksHydrogen;
+
+  if (strcmp(drinkToMake, "VODKA") == 0)
+  {
+    numberOfAtomsNeeded("WATER", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("ALCOHOL", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("GLUCOSE", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+  }
+
+  if (strcmp(drinkToMake, "CHAMPAGNE") == 0)
+  {
+    numberOfAtomsNeeded("WATER", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("ALCOHOL", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("CARBON DIODXIDE", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+  }
+
+  if (strcmp(drinkToMake, "SOFT DRINK") == 0)
+  {
+    numberOfAtomsNeeded("WATER", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("GLUCOSE", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("CARBON DIODXIDE", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+  }
+
+  CounerDrinksCarbon = wareHouse->carbon / total_carbon;
+  CounerDrinksOxygen = wareHouse->oxygen / total_oxygen;
+  CounerDrinksHydrogen = wareHouse->hydrogen / total_hydrogen;
+  int minimum = min(CounerDrinksCarbon, CounerDrinksHydrogen, CounerDrinksOxygen);
+
+  printf("number of %s drinks can make %d\n",drinkToMake,minimum);
+}
+
+
 //----------------------------------------------------------------------------------------
 
 int main(int argc, char *argv[])
@@ -553,6 +625,9 @@ int main(int argc, char *argv[])
 
           strncpy(drink, buffer + 4, sizeof(drink) - 1);
           drink[sizeof(drink) - 1] = '\0';
+
+          howManyDrinks(&warehouse,drink);
+          printf("---------------------------------------\n");
 
           status = genDrinks(&warehouse, drink);
           if (status)

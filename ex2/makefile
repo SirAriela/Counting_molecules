@@ -4,7 +4,7 @@ LDFLAGS=-lgcov
 
 all: supplier warehouse molecule_requestor
 
-supplier: supplier.o
+supplier: atom_supplier.o
 	$(CC) $(CFLAGS) -o atom_supplier atom_supplier.o
 supplier.o: atom_supplier.c
 	$(CC) $(CFLAGS) -c atom_supplier.c

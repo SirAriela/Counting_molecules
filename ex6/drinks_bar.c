@@ -89,8 +89,9 @@ struct flock lock = {
 // Function to lock the warehouse file
 int lock_warehouse()
 {
-  if (warehouse_fd == -1) return 0; // No file locking needed
-  
+  if (warehouse_fd == -1)
+    return 0; // No file locking needed
+
   if (fcntl(warehouse_fd, F_SETLKW, &lock) == -1)
   {
     perror("Failed to lock warehouse file");
@@ -102,16 +103,16 @@ int lock_warehouse()
 // Function to unlock the warehouse file
 int unlock_warehouse()
 {
-  if (warehouse_fd == -1) return 1; // No file locking needed
-  
+  if (warehouse_fd == -1)
+    return 1; // No file locking needed
+
   struct flock unlock_lock = {
-    .l_type = F_UNLCK,
-    .l_whence = SEEK_SET,
-    .l_start = 0,
-    .l_len = sizeof(wareHouse),
-    .l_pid = 0
-  };
-  
+      .l_type = F_UNLCK,
+      .l_whence = SEEK_SET,
+      .l_start = 0,
+      .l_len = sizeof(wareHouse),
+      .l_pid = 0};
+
   if (fcntl(warehouse_fd, F_SETLK, &unlock_lock) == -1)
   {
     perror("Failed to unlock warehouse file");
@@ -124,11 +125,11 @@ int unlock_warehouse()
 int init_warehouse_file(const char *file_path, int carbon, int hydrogen, int oxygen)
 {
   warehouse_file_path = strdup(file_path);
-  
+
   // Try to open existing file first
   warehouse_fd = open(file_path, O_RDWR);
   int file_exists = (warehouse_fd != -1);
-  
+
   if (!file_exists)
   {
     // Create new file
@@ -138,14 +139,13 @@ int init_warehouse_file(const char *file_path, int carbon, int hydrogen, int oxy
       perror("Failed to create warehouse file");
       return 0;
     }
-    
+
     // Initialize file with default values
     wareHouse initial_warehouse = {
-      .carbon = (carbon > 0) ? carbon : 0,
-      .hydrogen = (hydrogen > 0) ? hydrogen : 0,
-      .oxygen = (oxygen > 0) ? oxygen : 0
-    };
-    
+        .carbon = (carbon > 0) ? carbon : 0,
+        .hydrogen = (hydrogen > 0) ? hydrogen : 0,
+        .oxygen = (oxygen > 0) ? oxygen : 0};
+
     if (write(warehouse_fd, &initial_warehouse, sizeof(wareHouse)) != sizeof(wareHouse))
     {
       perror("Failed to initialize warehouse file");
@@ -165,7 +165,7 @@ int init_warehouse_file(const char *file_path, int carbon, int hydrogen, int oxy
     }
     lseek(warehouse_fd, 0, SEEK_SET);
   }
-  
+
   // Map file to memory
   warehouse_ptr = mmap(NULL, sizeof(wareHouse), PROT_READ | PROT_WRITE, MAP_SHARED, warehouse_fd, 0);
   if (warehouse_ptr == MAP_FAILED)
@@ -174,15 +174,16 @@ int init_warehouse_file(const char *file_path, int carbon, int hydrogen, int oxy
     close(warehouse_fd);
     return 0;
   }
-  
+
   return 1;
 }
 
 // Modified addAtom function to work with file-backed storage
 void addAtom(int atom, int quantity, wareHouse *warehouse)
 {
-  if (!lock_warehouse()) return;
-  
+  if (!lock_warehouse())
+    return;
+
   switch (atom)
   {
   case 1:
@@ -198,13 +199,13 @@ void addAtom(int atom, int quantity, wareHouse *warehouse)
     printf("Unknown atom type\n");
     break;
   }
-  
+
   // Force write to disk
   if (warehouse_ptr)
   {
     msync(warehouse_ptr, sizeof(wareHouse), MS_SYNC);
   }
-  
+
   unlock_warehouse();
 }
 
@@ -265,8 +266,9 @@ void numberOfAtomsNeeded(const char *molecule, int *carbon, int *oxygen,
 int deliverMolecules(wareHouse *wareHouse, const char *molecule,
                      int numOfMolecules)
 {
-  if (!lock_warehouse()) return 0;
-  
+  if (!lock_warehouse())
+    return 0;
+
   int carbon, oxygen, hydrogen;
   numberOfAtomsNeeded(molecule, &carbon, &oxygen, &hydrogen, numOfMolecules);
 
@@ -288,13 +290,13 @@ int deliverMolecules(wareHouse *wareHouse, const char *molecule,
   wareHouse->carbon -= carbon;
   wareHouse->hydrogen -= hydrogen;
   wareHouse->oxygen -= oxygen;
-  
+
   // Force write to disk
   if (warehouse_ptr)
   {
     msync(warehouse_ptr, sizeof(wareHouse), MS_SYNC);
   }
-  
+
   unlock_warehouse();
   return 1;
 }
@@ -306,8 +308,9 @@ int deliverMolecules(wareHouse *wareHouse, const char *molecule,
 // Modified genDrinks function to work with file-backed storage
 int genDrinks(wareHouse *wareHouse, const char *drinkToMake)
 {
-  if (!lock_warehouse()) return 0;
-  
+  if (!lock_warehouse())
+    return 0;
+
   int total_carbon = 0, total_oxygen = 0, total_hydrogen = 0;
   int carbon, oxygen, hydrogen;
 
@@ -371,15 +374,86 @@ int genDrinks(wareHouse *wareHouse, const char *drinkToMake)
   wareHouse->carbon -= total_carbon;
   wareHouse->hydrogen -= total_hydrogen;
   wareHouse->oxygen -= total_oxygen;
-  
+
   // Force write to disk
   if (warehouse_ptr)
   {
     msync(warehouse_ptr, sizeof(wareHouse), MS_SYNC);
   }
-  
+
   unlock_warehouse();
   return 1;
+}
+
+int min(int a, int b, int c)
+{
+  if (a <= b && a <= c)
+    return a;
+  if (b <= a && b <= c)
+    return b;
+  return c;
+}
+
+void howManyDrinks(wareHouse *wareHouse, const char *drinkToMake)
+{
+  int total_carbon = 0, total_oxygen = 0, total_hydrogen = 0;
+  int carbon, oxygen, hydrogen;
+  unsigned long long CounerDrinksCarbon, CounerDrinksOxygen, CounerDrinksHydrogen;
+
+  if (strcmp(drinkToMake, "VODKA") == 0)
+  {
+    numberOfAtomsNeeded("WATER", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("ALCOHOL", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("GLUCOSE", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+  }
+
+  if (strcmp(drinkToMake, "CHAMPAGNE") == 0)
+  {
+    numberOfAtomsNeeded("WATER", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("ALCOHOL", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("CARBON DIODXIDE", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+  }
+
+  if (strcmp(drinkToMake, "SOFT DRINK") == 0)
+  {
+    numberOfAtomsNeeded("WATER", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("GLUCOSE", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("CARBON DIODXIDE", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+  }
+
+  CounerDrinksCarbon = wareHouse->carbon / total_carbon;
+  CounerDrinksOxygen = wareHouse->oxygen / total_oxygen;
+  CounerDrinksHydrogen = wareHouse->hydrogen / total_hydrogen;
+  int minimum = min(CounerDrinksCarbon, CounerDrinksHydrogen, CounerDrinksOxygen);
+
+  printf("number of %s drinks can make %d\n", drinkToMake, minimum);
 }
 
 //----------------------------------------------------------------------------------------
@@ -847,6 +921,8 @@ int main(int argc, char *argv[])
           strncpy(drink, buffer + 4, sizeof(drink) - 1);
           drink[sizeof(drink) - 1] = '\0';
 
+          howManyDrinks(&warehouse, drink);
+          printf("---------------------------------------\n");
           status = genDrinks(warehouse_ref, drink);
           if (status)
           {

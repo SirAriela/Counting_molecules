@@ -7,7 +7,7 @@
 #include <string.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
-#include <sys/un.h>  // Added for Unix Domain Sockets
+#include <sys/un.h> // Added for Unix Domain Sockets
 #include <unistd.h>
 #include <getopt.h>
 
@@ -36,11 +36,14 @@ void handle_alarm(int sig)
   exit(0);
 }
 
-void cleanup_socket_files() {
-  if (stream_path) {
+void cleanup_socket_files()
+{
+  if (stream_path)
+  {
     unlink(stream_path);
   }
-  if (datagram_path) {
+  if (datagram_path)
+  {
     unlink(datagram_path);
   }
 }
@@ -221,19 +224,90 @@ int genDrinks(wareHouse *wareHouse, const char *drinkToMake)
   return 1;
 }
 
+int min(int a, int b, int c)
+{
+  if (a <= b && a <= c)
+    return a;
+  if (b <= a && b <= c)
+    return b;
+  return c;
+}
+
+void howManyDrinks(wareHouse *wareHouse, const char *drinkToMake)
+{
+  int total_carbon = 0, total_oxygen = 0, total_hydrogen = 0;
+  int carbon, oxygen, hydrogen;
+  unsigned long long CounerDrinksCarbon, CounerDrinksOxygen, CounerDrinksHydrogen;
+
+  if (strcmp(drinkToMake, "VODKA") == 0)
+  {
+    numberOfAtomsNeeded("WATER", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("ALCOHOL", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("GLUCOSE", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+  }
+
+  if (strcmp(drinkToMake, "CHAMPAGNE") == 0)
+  {
+    numberOfAtomsNeeded("WATER", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("ALCOHOL", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("CARBON DIODXIDE", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+  }
+
+  if (strcmp(drinkToMake, "SOFT DRINK") == 0)
+  {
+    numberOfAtomsNeeded("WATER", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("GLUCOSE", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+    numberOfAtomsNeeded("CARBON DIODXIDE", &carbon, &oxygen, &hydrogen, 1);
+    total_carbon += carbon;
+    total_hydrogen += hydrogen;
+    total_oxygen += oxygen;
+  }
+
+  CounerDrinksCarbon = wareHouse->carbon / total_carbon;
+  CounerDrinksOxygen = wareHouse->oxygen / total_oxygen;
+  CounerDrinksHydrogen = wareHouse->hydrogen / total_hydrogen;
+  int minimum = min(CounerDrinksCarbon, CounerDrinksHydrogen, CounerDrinksOxygen);
+
+  printf("number of %s drinks can make %d\n", drinkToMake, minimum);
+}
+
 //----------------------------------------------------------------------------------------
 
 int main(int argc, char *argv[])
 {
   // for ex 4
-  //argument options, simple and long opt.
+  // argument options, simple and long opt.
   int c;
   int tcp_port = -1;
   int udp_port = -1;
   int carbon = -1, oxygen = -1, hydrogen = -1;
   int timeout = 0;
 
-  //long opt
+  // long opt
   struct option longopts[] = {
       {"oxygen", required_argument, NULL, 'o'},
       {"carbon", required_argument, NULL, 'c'},
@@ -245,7 +319,7 @@ int main(int argc, char *argv[])
       {"datagram-path", required_argument, NULL, 'd'},
       {0, 0, 0, 0}};
 
-  //all options
+  // all options
   while ((c = getopt_long(argc, argv, ":T:U:c:o:h:t:s:d:", longopts, NULL)) != -1)
   {
     switch (c)
@@ -268,7 +342,8 @@ int main(int argc, char *argv[])
 
     case 'c':
       carbon = atoi(optarg);
-      if(carbon < 0){
+      if (carbon < 0)
+      {
         fprintf(stderr, "need a positive integer:(\n");
         exit(EXIT_FAILURE);
       }
@@ -276,7 +351,8 @@ int main(int argc, char *argv[])
 
     case 'o':
       oxygen = atoi(optarg);
-       if(oxygen < 0){
+      if (oxygen < 0)
+      {
         fprintf(stderr, "need a positive integer:(\n");
         exit(EXIT_FAILURE);
       }
@@ -284,7 +360,8 @@ int main(int argc, char *argv[])
 
     case 'h':
       hydrogen = atoi(optarg);
-       if(hydrogen < 0){
+      if (hydrogen < 0)
+      {
         fprintf(stderr, "need a positive integer:(\n");
         exit(EXIT_FAILURE);
       }
@@ -304,13 +381,15 @@ int main(int argc, char *argv[])
   int has_inet_sockets = (tcp_port != -1 && udp_port != -1);
   int has_uds_sockets = (stream_path != NULL && datagram_path != NULL);
 
-  if (!has_inet_sockets && !has_uds_sockets) {
+  if (!has_inet_sockets && !has_uds_sockets)
+  {
     fprintf(stderr, "Usage: %s [-T <tcp_port> -U <udp_port>] OR [-s <stream_path> -d <datagram_path>]\n", argv[0]);
     exit(EXIT_FAILURE);
   }
 
   // Check for conflicting arguments
-  if (has_inet_sockets && has_uds_sockets) {
+  if (has_inet_sockets && has_uds_sockets)
+  {
     fprintf(stderr, "Error: Cannot use both inet sockets (TCP/UDP) and Unix domain sockets simultaneously\n");
     exit(EXIT_FAILURE);
   }
@@ -344,7 +423,8 @@ int main(int argc, char *argv[])
   int listen_fd = -1, udp_fd = -1;
   struct sockaddr_un unix_addr;
 
-  if (has_inet_sockets) {
+  if (has_inet_sockets)
+  {
     // Validate inet ports
     if (tcp_port <= 0 || tcp_port > 65535 || udp_port <= 0 || udp_port > 65535)
     {
@@ -406,7 +486,8 @@ int main(int argc, char *argv[])
 
     printf("Server running on TCP port %d and UDP port %d...\n", tcp_port, udp_port);
   }
-  else {
+  else
+  {
     // UDS setup
     //--------------------UDS stream socket setup-------------------------------
     listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -461,7 +542,7 @@ int main(int argc, char *argv[])
       return 1;
     }
 
-    printf("Server running on UDS stream socket %s and datagram socket %s...\n", 
+    printf("Server running on UDS stream socket %s and datagram socket %s...\n",
            stream_path, datagram_path);
   }
 
@@ -492,7 +573,8 @@ int main(int argc, char *argv[])
     // Handle new connections first (both TCP and UDS stream)
     if (fds[0].revents & POLLIN)
     {
-      if (timeout > 0) alarm(timeout);
+      if (timeout > 0)
+        alarm(timeout);
       int client_fd = accept(listen_fd, NULL, NULL);
       if (client_fd >= 0 && nfds < MAX_CLIENTS)
       {
@@ -512,7 +594,8 @@ int main(int argc, char *argv[])
     // Handle datagram messages (both UDP and UDS datagram)
     if (fds[1].revents & POLLIN)
     {
-      if (timeout > 0) alarm(timeout);
+      if (timeout > 0)
+        alarm(timeout);
       char buffer[256];
       ssize_t len = recvfrom(udp_fd, buffer, sizeof(buffer) - 1, 0,
                              (struct sockaddr *)&client_addr, &addr_len);
@@ -579,7 +662,8 @@ int main(int argc, char *argv[])
     {
       if (fds[i].revents & POLLIN)
       {
-        if (timeout > 0) alarm(timeout);
+        if (timeout > 0)
+          alarm(timeout);
         char buffer[256];
         ssize_t len = read(fds[i].fd, buffer, sizeof(buffer) - 1);
 
@@ -634,7 +718,8 @@ int main(int argc, char *argv[])
     // Handle stdin input
     if (fds[2].revents & POLLIN)
     {
-      if (timeout > 0) alarm(timeout);
+      if (timeout > 0)
+        alarm(timeout);
       char buffer[256];
       char drink[64];
       int status;
@@ -650,6 +735,8 @@ int main(int argc, char *argv[])
           strncpy(drink, buffer + 4, sizeof(drink) - 1);
           drink[sizeof(drink) - 1] = '\0';
 
+          howManyDrinks(&warehouse, drink);
+          printf("---------------------------------------\n");
           status = genDrinks(&warehouse, drink);
           if (status)
           {
@@ -687,7 +774,8 @@ int main(int argc, char *argv[])
   }
 
   close(listen_fd);
-  if (udp_fd != -1) close(udp_fd);
+  if (udp_fd != -1)
+    close(udp_fd);
   printf("Server terminated.\n");
   return 0;
 }
