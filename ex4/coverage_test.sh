@@ -302,6 +302,11 @@ kill -SIGINT $SERVER_PID 2>/dev/null
 wait $SERVER_PID 2>/dev/null
 ' || echo "✓ UDP newline test done"
 
+echo "Test: alaram flag"
+
+./drinks_bar -T 8080 -U 8081 -c 5 -h 5 -o 5 -t 1 
+
+echo "✓ Alarm flag test done"
 
 # Stop server
 echo "Stopping server..."

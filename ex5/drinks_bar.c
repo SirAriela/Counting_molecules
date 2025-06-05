@@ -563,9 +563,7 @@ int main(int argc, char *argv[])
   {
     int ready = poll(fds, nfds, 1000);
     if (ready < 0)
-    {
-      if (!running)
-        break;
+    { 
       perror("poll");
       break;
     }

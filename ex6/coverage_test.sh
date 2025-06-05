@@ -349,8 +349,31 @@ echo "Test: alaram flag"
 ./drinks_bar -T 8080 -U 8081 -c 5 -h 5 -o 5 -t 1 
 
 echo "✓ Alarm flag test done"
+kill -SIGINT $SERVER_PID 2>/dev/null
+wait $SERVER_PID 2>/dev/null || true
 
 
+echo "Test: 2 servers on same port"
+
+# Start first server
+./drinks_bar -T 8080 -U 8081 -f warehouse.dat -c 100 -h 200 -o 150 &
+SERVER_PID=$!
+
+sleep 1
+
+# Start second server with piped input
+(sleep 2; echo "GEN VODKA"; sleep 3) | ./drinks_bar -T 9090 -U 9091 -f warehouse.dat &
+SERVER_PID2=$!
+
+sleep 6
+
+# Clean up
+kill -SIGINT $SERVER_PID 2>/dev/null
+kill -SIGINT $SERVER_PID2 2>/dev/null
+wait $SERVER_PID 2>/dev/null || true
+wait $SERVER_PID2 2>/dev/null || true
+
+echo "✓ 2 servers on same port test done"
 
 # Stop server
 echo "Stopping server..."

@@ -921,7 +921,7 @@ int main(int argc, char *argv[])
           strncpy(drink, buffer + 4, sizeof(drink) - 1);
           drink[sizeof(drink) - 1] = '\0';
 
-          howManyDrinks(&warehouse, drink);
+          howManyDrinks(warehouse_ref, drink);
           printf("---------------------------------------\n");
           status = genDrinks(warehouse_ref, drink);
           if (status)
